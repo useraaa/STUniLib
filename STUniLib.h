@@ -316,6 +316,8 @@ public:
 	BOOL SetLight(HANDLE hDev, BYTE Value, BYTE num);
 	// Получить изображение с устройства
 	BOOL GetImage(HANDLE hDev, PBYTE image);
+	// Получить 10 битное изображение с устройства LSxFP10
+	BOOL GetImage16(HANDLE hDev, PSHORT image);
 	// Переключить камеру (0 - правая, 1 - левая)
 	BYTE SetCamera(HANDLE hDev, BYTE num);
 	// Прочитать значение смещения сигнала в подключенной камере(-255:+255)(*2мВ)

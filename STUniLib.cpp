@@ -263,11 +263,12 @@ BOOL KCP2001::GetGain(HANDLE hDev, PBYTE pValue)
 BOOL KCP2001::GetImage(HANDLE hDev, PBYTE image)
 {
  
-	int dev_num = 0;
+	BYTE dev_num = 0;
 	int len = 0;
+	BYTE twelve_bit_mode = 0;
 
 	if ((dev_num = get_device_num(hDev)) < 0) {
-		printf("Specified handle is wrong");
+		std::cout << "Device handle is not from device tree!";
 		return FALSE;
 	}
 
@@ -275,13 +276,14 @@ BOOL KCP2001::GetImage(HANDLE hDev, PBYTE image)
 
 	if ( dev_tr.device[dev_num].Descriptor.iSerialNumber == 10 )
 	{
+		twelve_bit_mode = 1;
 		len *= 2;
 	}
 
 	if (ReadPipeMem(hDev, image, (DWORD)len) == len)
 	{
 		// If we have 10bit scanner we should prepare the array
-		if (dev_tr.device[dev_num].Descriptor.iSerialNumber == 10)
+		if (twelve_bit_mode)
 		{
 			for (int i = 0; i < len; i++) {
 				image[i] = ((PUSHORT)image)[i] >> 2;
@@ -292,25 +294,32 @@ BOOL KCP2001::GetImage(HANDLE hDev, PBYTE image)
 	}
 	return FALSE;
 }
+/*
 
-/*BOOL KCP2001::GetImage16(HANDLE hDev, PSHORT image)
+*/
+BOOL KCP2001::GetImage16(HANDLE hDev, PSHORT image)
 {
-  int Size;
+  int Size; 
+  BYTE dev_num = 0;
   int len = 0;
-  int dev_num = 0;
 
-	if ((dev_num = get_device_num(hDev)) < 0) {
-		printf("Specified handle is wrong");
-		return FALSE;
-	}
+  if ((dev_num = get_device_num(hDev)) < 0) {
+	  std::cout << "Device handle is not from device tree!";
+	  return FALSE;
+  }
 
-
+  if (dev_tr.device[dev_num].Descriptor.iSerialNumber != 10)
+  {
+	  std::cout << "Device not comaptible with 10bit mode!";
+	  return false;
+  }
 
   len = current_width*current_height*2;
+
   Size = ReadPipeMem(hDev, (PBYTE) image, (DWORD)len);
   if(Size == len) return TRUE;
   return FALSE;
-} */
+} 
 
 int KCP2001::ReadPipeMem(HANDLE hDev, PBYTE KCP2001_pMemCam, DWORD Len)
 {
