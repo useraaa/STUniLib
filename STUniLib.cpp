@@ -358,49 +358,53 @@ BYTE KCP2001::SetCamera(HANDLE hDev, BYTE num)
   if(VendorRequest(hDev, &Req, 0)) return num;
   return 0xff;
 }
-  /*
-
-BYTE KCP2001::SetMode(HANDLE hDev, BYTE mode)
-{
-  VENDOR_OR_CLASS_REQUEST_CONTROL Req;
-
-  Req.request = 0xD5;
-  Req.value = (BYTE)mode;
-  Req.requestTypeReservedBits = 0;
-  Req.index = 0;
-  Req.direction = 0;   // 0=host to device, 1=device to host
-  Req.requestType = 2; // 1=class, 2=vendor
-  Req.recepient = 0;   // 0=device,1=interface,2=endpoint,3=other
-
-  if(VendorRequest(hDev, &Req, 0)) return 0;
-  return 0xff;
-}        */
-
+  
 //---------------------------------------------------------------------------
 // Прочитать регистр сопротивления по I2C
- BOOL KCP2001::GetLight(HANDLE hDev, PBYTE pData, BYTE num)
+BOOL KCP2001::GetLight(HANDLE hDev, PBYTE pData, BYTE num)
 {
-	if (num > 2) return false;
 	PWORD pDat = (PWORD)pCam;
-	if (UploadI2C(hDev, 0, 1, pDat, ((0x2C00>>8)+num)<<8))
-	{
-		*pData = 255 - *pDat;
-		return true;
-	}
 
+	switch (num) {
+	case 0:	// Bottom backligth for right camera
+		if (!UploadI2C(hDev, 0, 1, pDat, 0x2E00)) return false;
+		break;
+	case 1: // Bottom backligth for left camera
+		if (!UploadI2C(hDev, 0, 1, pDat, 0x2C00)) return false;
+		break;
+	case 2: // Top backligth for left camera
+		if (!UploadI2C(hDev, 0, 1, pDat, 0x2D00)) return false;
+		break;
+	case 3: // Top backligth for right camera
+		if (!UploadI2C(hDev, 0, 1, pDat, 0x2F00)) return false;
+		break;
+	}
+	*pData = 255 - *pDat;
 	return false;
 }
 //---------------------------------------------------------------------------
 // Записать регистр сопротивления по I2C
- BOOL KCP2001::SetLight(HANDLE hDev, BYTE Data, BYTE num)
+BOOL KCP2001::SetLight(HANDLE hDev, BYTE Data, BYTE num)
 {
-   //	if (num > 2) return false;
 	PWORD pData = (PWORD)pCam;
 	pData[0] = 255 - Data;
-	if (DownloadI2C(hDev, 0, 1, pData, ((0x2C00>>8)+num)<<8)) return true;
+	switch (num) {
+	case 0:	// Bottom backligth for right camera
+		if (DownloadI2C(hDev, 0, 1, pData, 0x2E00)) return true;
+		break;
+	case 1: // Bottom backligth for left camera
+		if (DownloadI2C(hDev, 0, 1, pData, 0x2C00)) return true;
+		break;
+	case 2: // Top backligth for left camera
+		if (DownloadI2C(hDev, 0, 1, pData, 0x2D00)) return true;
+		break;
+	case 3: // Top backligth for right camera
+		if (DownloadI2C(hDev, 0, 1, pData, 0x2F00)) return true;
+		break;
+	}
+
 	return false;
 }
-
 
 
 
