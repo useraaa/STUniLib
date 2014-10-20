@@ -249,7 +249,7 @@ public:
 	BOOL GetSerialNo(HANDLE hDev, PWORD pBuff);
 	BOOL SetSerialNo(HANDLE hDev, WORD serial);
 	// Получить тип устройства
-	BOOL _fastcall GetType(HANDLE hDev, pdevice_type pValue, BYTE *bitcount);
+	BOOL _fastcall GetType(HANDLE hDev, pdevice_type pValue, PBYTE bitcount);
 	// Reset device;
 	BOOL __fastcall ResetDevice(HANDLE hDev, BYTE RestBit);
 	// Vendor request с устанавливаемыми параметрами
@@ -286,13 +286,12 @@ public:
 	// Прочитать внешнюю, по отношению к FX2, память
 	BOOL UploadHigh(HANDLE hDev, WORD Addr, WORD Len, PBYTE pData);
 	// Прочитать настройки
-	// pData - указатель на массив длинною len(в байтах);
+	// pData - указатель на массив длинною len(в байтах). Не более 1К!;
 	BOOL GetSettings(HANDLE hDev, PBYTE pData, WORD len);
 	// Записать настройки
-	// pData - указатель на массив длинною len(в байтах);
+	// pData - указатель на массив длинною len(в байтах). Не более 1К!;
 	BOOL SetSettings(HANDLE hDev, PBYTE pData, WORD len);
-
-protected:
+	 
 
 };
 
@@ -320,9 +319,9 @@ public:
 	// Переключить камеру (0 - правая, 1 - левая)
 	BYTE SetCamera(HANDLE hDev, BYTE num);
 	// Прочитать значение смещения сигнала в подключенной камере(-255:+255)(*2мВ)
-	BOOL GetOffset(HANDLE hDev, short *pValue);
+	BOOL GetOffset(HANDLE hDev, PSHORT pValue);
 	// Записать значение смещения сигнала в подключенной камере (-255:+255)(*2мВ)
-	BOOL SetOffset(HANDLE hDev, short *offset);
+	BOOL SetOffset(HANDLE hDev, PSHORT offset);
 protected:
 	// Читать из EP2
 	int ReadPipeMem(HANDLE hDev, PBYTE KCP2001_pMemCam, DWORD Len);
@@ -330,68 +329,7 @@ protected:
 
 };
 
-
-class DLL_EX KCL001 : public ST_USBDevice		// класс для совмещенного контроллера KCP-2001
-{
-
-public:
-
-	KCL001(void);
-	~KCL001(void);
-
-	// Управление двигателем
-	// набор команд указан в ОПРЕДЕЛЕНИЯХ
-	// value соответствующее значение команды
-	BOOL MotorCmd(HANDLE hDev, BYTE cmd, WORD value);
-	// Чтение состояния двигателя
-	// 1 байт - состояние IOE
-	// 2 байт - интервал скорости
-	// 3 байт - число сброса счетчика
-	BOOL GetMotorState(HANDLE hDev, PDWORD pState);
-	// Прочитать текущее количество шагов двигателя
-	BOOL GetStep(HANDLE hDev, PSHORT pStep);
-	// Получить текущую позицию указанной линейки в импульсах энкодера
-	BOOL GetCurPos(HANDLE hDev, PSHORT pCurPos);
-	// Запустить автоматическое считывание линейки
-	BOOL StartAutoRead(HANDLE hDev, WORD Len);
-	// Остановить автоматическое считывание линейки
-	BOOL StopAutoRead(HANDLE hDev);
-	// Чтение считанного изображения
-	int ReadScanPipe(HANDLE hDev, PWORD pMemScan, DWORD Len);
-	// Прочитать регистры сопротивления подсветки по I2C
-	BOOL GetLight(HANDLE hDev, PBYTE pData, BYTE num);
-	// Записать регистры сопротивления подсветки по I2C
-	BOOL SetLight(HANDLE hDev, BYTE Data, BYTE num);
-	// Получить значения конечников
-	BOOL GetTreilers(HANDLE hDev, bool* pTrail);
-	// Переключить режим
-	BOOL Switch_mode(HANDLE hDev, int mode);
-	// Запустить однократное считывание линейки
-	BOOL GoRead(HANDLE hDev, WORD Len);
-	// Чтение регистра АЦП линейки
-	BOOL GetADC(HANDLE hDev,BYTE page_num, BYTE Reg, PBYTE pData);
-	// Запись регистра АЦП линейки
-	BOOL SetADC(HANDLE hDev, BYTE page_num, BYTE Reg, BYTE Data);
-	// Прочитать размеры окна камеры
-	BOOL GetFrameProperty(HANDLE hDev, PFRAME_PROPERTY pFrame);
-	// Установить размеры окна камеры
-	BOOL SetFrameProperty(HANDLE hDev, PFRAME_PROPERTY pFrame);
-	// Установить усиление камеры(0-127)
-	BOOL SetGain(HANDLE hDev, BYTE Value);
-	// Прочитать усиление камеры
-	BOOL GetGain(HANDLE hDev, PBYTE pValue);
-	// Получить изображение с устройства
-	BOOL GetImage(HANDLE hDev, PBYTE image);
-	// Прочитать смещение камеры
-	BOOL GetOffset(HANDLE hDev, short *pValue);
-	// Записать смещение камеры
-	BOOL SetOffset(HANDLE hDev, short *offset);
-
-protected:
-	// Читать из EP2
-	int ReadPipeMem(HANDLE hDev, PBYTE KCP2001_pMemCam, DWORD Len);
-
-};
+ 
 
 void __fastcall AllocateMemory(void);
 void __fastcall FreeMemory(void);
