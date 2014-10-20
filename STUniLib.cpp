@@ -1,9 +1,14 @@
 //---------------------------------------------------------------------------
 // STUniLib.cpp
 //---------------------------------------------------------------------------
-
+#include "stdafx.h"
 #include "STUniLib.h"
 #include "Vend_Ax.h"
+
+#include <cstdlib>
+#include <iostream>
+#include <wchar.h>
+
 
 void __fastcall AllocateMemory(void);
 void __fastcall FreeMemory(void);
@@ -13,7 +18,7 @@ void *pMem = NULL,
 	 *pScan = NULL;
 
 device_tree dev_tr;
-
+ 
 BOOL APIENTRY DllMain( HANDLE hModule,
                        DWORD  ul_reason_for_call,
                        LPVOID lpReserved)
@@ -414,22 +419,24 @@ ST_USBDevice::~ST_USBDevice(void)
 // Открыть устройство
 HANDLE ST_USBDevice::OpenDevice(int Number)
 {
-  char DevName[20];
-  wsprintf(DevName,"\\\\.\\UsbCam-%d", Number);
+	 
+	wchar_t *DevName = new wchar_t[32];
+	wsprintf(DevName, (LPWSTR)"\\\\.\\UsbCam-%d", Number);
 
-  HANDLE hnd = CreateFile(DevName, GENERIC_WRITE|GENERIC_READ, FILE_SHARE_WRITE,
+	HANDLE hnd = CreateFile(DevName, GENERIC_WRITE|GENERIC_READ, FILE_SHARE_WRITE,
 					NULL, OPEN_EXISTING, 0, NULL);
 
-  dev_tr.device[Number].dev = hnd;
-
-  return hnd;
+	dev_tr.device[Number].dev = hnd;
+	delete DevName;
+	return hnd;
 }
 
 void ST_USBDevice::CloseDevice(int Number)
 {
-  char DevName[20];
-  wsprintf(DevName,"\\\\.\\UsbCam-%d", Number);
+	wchar_t *DevName = new wchar_t[32];
+	wsprintf(DevName, (LPWSTR)"\\\\.\\UsbCam-%d", Number);
   DeleteFile(DevName);
+  delete DevName;
   return;
 }
 //---------------------------------------------------------------------------
@@ -926,6 +933,7 @@ BOOL ST_USBDevice::DownloadFirmware(HANDLE hDev, PCHAR pHexFileName)
   }
   return bRet;
 }
+ 
 //---------------------------------------------------------------------------
 // 4K Control EP0 transfer limit imposed by OS
 #define MAX_EP0_XFER_SIZE (1024*4)
@@ -938,12 +946,18 @@ BOOL __fastcall ST_USBDevice::FileToCache(TMemCache* pMemCache, CHAR *pHexFileNa
   int i, recType, cnt;
   int CNTFIELD, ADDRFIELD, RECFIELD, DATAFIELD;
   PCHAR pstr, str;
-  PCHAR pBuf;
+  PCHAR pBuf = NULL;
   DWORD byte, addr, lenFile, totalRead;
   PBYTE ptr;
-
-  hFile = CreateFile(pHexFileName, GENERIC_READ, FILE_SHARE_READ,
+  size_t newsize = strlen(pHexFileName) + 1;
+  wchar_t * wcstring = new wchar_t[newsize];
+  size_t convertedChars = 0;
+   
+  mbstowcs_s(&convertedChars, wcstring, newsize, pHexFileName, _TRUNCATE);
+  hFile = CreateFile(wcstring, GENERIC_READ, FILE_SHARE_READ,
                      NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  delete wcstring;
+
   if(hFile == INVALID_HANDLE_VALUE) {
 //    MessageBox(NULL,"Error CreateFile","FileToCache",MB_OK);
     return FALSE;
@@ -1001,13 +1015,13 @@ BOOL __fastcall ST_USBDevice::FileToCache(TMemCache* pMemCache, CHAR *pHexFileNa
         DATAFIELD = 9 + 4;
       }
 
-      sscanf(str+RECFIELD, "%2x", &recType);
+      sscanf_s(str+RECFIELD, "%2x", &recType);
 
       ptr = (PBYTE)pMemCache->pImg;
       switch(recType) {
         case 0: // data record
-          sscanf(str+CNTFIELD, "%2x", &cnt);
-          sscanf(str+ADDRFIELD, "%4x", &addr);
+          sscanf_s(str+CNTFIELD, "%2x", &cnt);
+          sscanf_s(str+ADDRFIELD, "%4x", &addr);
           ptr += addr; // get pointer to location in image
 
           if (pMemCache->nSeg &&
@@ -1027,7 +1041,7 @@ BOOL __fastcall ST_USBDevice::FileToCache(TMemCache* pMemCache, CHAR *pHexFileNa
           }
 
           for (i = 0; i < cnt; i++) {
-            sscanf(str+DATAFIELD+i*2, "%2x", &byte);
+            sscanf_s(str+DATAFIELD+i*2, "%2x", &byte);
             *(ptr + i) = (CHAR)byte;
           }
         break;
