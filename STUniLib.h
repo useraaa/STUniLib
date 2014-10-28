@@ -11,103 +11,17 @@
 #include <winioctl.h>
 #include <stdio.h>
 
-//---------------------------------------------------------------------------
-// Размер области памяти для работы с устройством
-#define LEN_MEM 4096
+ 
 
 #define CAMW 1280
 #define CAMH 1024
-#define MAX_DEV_COUNT 8
+#define MAX_DEVICE_COUNT 8
 #define FRAME_SIZE CAMW*CAMH
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-//---------------------------------------------------------------------------
-//  Определения для работы с устройством и его периферией
-#define MAX_DEVICE_COUNT 8
-
-
-#define STEP_QUANTITY 0		//  команда на установку делителя шага двигателя
-#define SPEED_SELECTION 1	//	команда на установку скорости вращения вала двигателся
-#define STEP_N 2			//  команда на установку шагов двигателя
-
-#define FULL_STEP 0			// кратность 1:1
-#define HALF_STEP 1			// кратность 1:2
-#define QUARTER_STEP 2		// кратность 1:4
-#define EIGHTH_STEP 3		// кратность 1:8
-#define SIXTEENTH_STEP 7	// кратность 1:16
-
-#define CW 0				// направление вращения двигателся - по часовой стр.
-#define CCW 1				// против часовой стр.
-
-#define SCAN_MODE 1			// режим сканирования линейным сенсором для KCL001
-#define CAM_MODE 0			// режим сканирования матричным сенсором для KCL001
-
-
-//---------------------------------------------------------------------------
-// Определения IOCTL индексов для обращения к драйверу
-#define USBCAM_IOCTL_INDEX  0x0800
-
-// Для команд HOLD, RUN
-#define IOCTL_UsbCam_VENDOR_REQUEST CTL_CODE(FILE_DEVICE_UNKNOWN,\
-                                     USBCAM_IOCTL_INDEX+5,\
-                                     METHOD_BUFFERED,\
-                                     FILE_ANY_ACCESS)
-
-// Для получения строки с версией
-#define IOCTL_UsbCam_GET_STRING_DESCRIPTOR  CTL_CODE(FILE_DEVICE_UNKNOWN,\
-                                     USBCAM_IOCTL_INDEX+17,\
-                                     METHOD_BUFFERED,\
-                                     FILE_ANY_ACCESS)
-
-// Для загрузки во внутреннюю память FX2
-#define IOCTL_USBCAM_ANCHOR_DOWNLOAD CTL_CODE(FILE_DEVICE_UNKNOWN,\
-                                     USBCAM_IOCTL_INDEX+27,\
-                                     METHOD_IN_DIRECT,\
-                                     FILE_ANY_ACCESS)
-
-
-//Для работы с "нулевой" конечной точкой FX2
-#define IOCTL_USBCAM_VENDOR_OR_CLASS_REQUEST CTL_CODE(FILE_DEVICE_UNKNOWN,\
-                                     USBCAM_IOCTL_INDEX+22,\
-                                     METHOD_IN_DIRECT,\
-                                     FILE_ANY_ACCESS)
-
-#define IOCTL_UsbCam_RESETPIPE CTL_CODE(FILE_DEVICE_UNKNOWN,\
-                                     USBCAM_IOCTL_INDEX+13,\
-                                     METHOD_IN_DIRECT,\
-                                     FILE_ANY_ACCESS)
-
-// для чтения указанного потока
-#define IOCTL_USBCAM_BULK_READ CTL_CODE(FILE_DEVICE_UNKNOWN,\
-                                     USBCAM_IOCTL_INDEX+19,\
-                                     METHOD_OUT_DIRECT,\
-                                     FILE_ANY_ACCESS)
-
-// Для чтения дескриптора устройства
-#define IOCTL_UsbCam_GET_DEVICE_DESCRIPTOR CTL_CODE(FILE_DEVICE_UNKNOWN,\
-                                     USBCAM_IOCTL_INDEX+1,\
-                                     METHOD_BUFFERED,\
-                                     FILE_ANY_ACCESS)
-
-// Для получения лога от драйвера
-#define IOCTL_USBCAM_GET_LOG CTL_CODE(FILE_DEVICE_UNKNOWN,\
-                                     USBCAM_IOCTL_INDEX+0x7f,\
-                                     METHOD_BUFFERED,\
-                                     FILE_ANY_ACCESS)
-
-// Сброс порта
-#define IOCTL_UsbCam_RESET   CTL_CODE(FILE_DEVICE_UNKNOWN,\
-                                     USBCAM_IOCTL_INDEX+12,\
-                                     METHOD_IN_DIRECT,\
-                                     FILE_ANY_ACCESS)
-
-// Для загрузки HEX файла в FX2
-#define TGT_IMG_SIZE 0x10000	// 64KB (65,536 Byte) target image
-#define TGT_SEG_SIZE 16			// 16 byte segments
-
+ 
 
 //---------------------------------------------------------------------------
 // Структура размера кадра
@@ -137,7 +51,7 @@ typedef struct _USB_DEVICE_DESCRIPTOR {
   USHORT bcdDevice;
   UCHAR  iManufacturer;
   UCHAR  iProduct;
-  UCHAR  iSerialNumber;
+  UCHAR  WordWidth;
   UCHAR  bNumConfigurations;
 } USB_DEVICE_DESCRIPTOR, *PUSB_DEVICE_DESCRIPTOR;
 
@@ -149,12 +63,9 @@ typedef enum _device_type {
 	LS1FP,		// однопалый, дроздов
 	LSPP,		// роликовый
 	LSPPFP,		// роликовый с прокаткой
-	LSPFP,		// плоская призма
-	LS1FP10,
-	LS2FP10
+	LSPFP		// плоская призма
 }device_type, *pdevice_type;
-
-char *device_names [] = {"NONE", "LS7", "LS2FP", "LS1FP", "LSPP", "LSPPFP", "LSPFP"};
+ 
 
 
 // Структура информации об устройстве в списке _device_tree
@@ -167,59 +78,8 @@ typedef struct _device_info {
 
 // Cпискок подключенных устройств
 typedef struct _device_tree {
-	device_info device[MAX_DEV_COUNT];
+	device_info device[MAX_DEVICE_COUNT];
 } device_tree, *pdevice_tree;
-
-// Служебные структуры
-typedef struct {
-  WORD Addr;
-  WORD Size;
-  PBYTE pData;
-} MemSeg;
-
-typedef struct {
-  BYTE data[TGT_IMG_SIZE];
-} TMemImg;
-
-typedef struct {
-  TMemImg *pImg;
-  int nSeg;
-  MemSeg pSeg[TGT_IMG_SIZE/TGT_SEG_SIZE];
-} TMemCache;
-
-typedef struct _GET_STRING_DESCRIPTOR_IN {
-  UCHAR    Index;
-  USHORT   LanguageId;
-} GET_STRING_DESCRIPTOR_IN, *PGET_STRING_DESCRIPTOR_IN;
-
-typedef struct _USB_STRING_DESCRIPTOR {
-  UCHAR  bLength;
-  UCHAR  bDescriptorType;
-  WCHAR  bString[1];
-} USB_STRING_DESCRIPTOR, *PUSB_STRING_DESCRIPTOR;
-
-typedef struct _VENDOR_OR_CLASS_REQUEST_CONTROL {
-  UCHAR direction;
-  UCHAR requestType;
-  UCHAR recepient;
-  UCHAR requestTypeReservedBits;
-  UCHAR request;
-  USHORT value;
-  USHORT index;
-} VENDOR_OR_CLASS_REQUEST_CONTROL, *PVENDOR_OR_CLASS_REQUEST_CONTROL;
-
-typedef struct _VENDOR_REQUEST_IN {
-  BYTE bRequest;
-  WORD wValue;
-  WORD wIndex;
-  WORD wLength;
-  BYTE direction;
-  BYTE bData;
-} VENDOR_REQUEST_IN, *PVENDOR_REQUEST_IN;
-
-typedef struct _BULK_TRANSFER_CONTROL {
-  ULONG pipeNum;
-} BULK_TRANSFER_CONTROL, *PBULK_TRANSFER_CONTROL;
 
 
 
@@ -249,7 +109,7 @@ public:
 	BOOL GetSerialNo(HANDLE hDev, PWORD pBuff);
 	BOOL SetSerialNo(HANDLE hDev, WORD serial);
 	// Получить тип устройства
-	BOOL _fastcall GetType(HANDLE hDev, pdevice_type pValue, PBYTE bitcount);
+	BOOL _fastcall GetType(HANDLE hDev, pdevice_type pValue);
 	// Reset device;
 	BOOL __fastcall ResetDevice(HANDLE hDev, BYTE RestBit);
 	// Vendor request с устанавливаемыми параметрами
@@ -276,9 +136,6 @@ public:
 	BOOL GetWAKEUPCS(HANDLE hDev, PBYTE pData);
 	// Читать из EP2
 	int ReadPipeMem(HANDLE hDev, PBYTE pMemCam, DWORD Len);
-	// Обработка HEX файла и заполнение MemCache данными
-	BOOL __fastcall FileToCache(TMemCache* pMemCache, CHAR *pHexFileName);
-	BOOL __fastcall VendorRequest(HANDLE hDev, PVENDOR_OR_CLASS_REQUEST_CONTROL pReq,WORD Len);
 	// Загрузить во внешнию, по отношению к FX2, память
 	BOOL DownLoadHigh(HANDLE hDev, WORD Addr, WORD Len, PBYTE pData);
 	// Прочитать внутреннюю память FX2
@@ -331,10 +188,6 @@ protected:
 
 };
 
- 
-
-void __fastcall AllocateMemory(void);
-void __fastcall FreeMemory(void);
 
 
 #ifdef __cplusplus

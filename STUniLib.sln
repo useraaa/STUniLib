@@ -5,6 +5,12 @@ VisualStudioVersion = 12.0.30723.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "STUniLib", "STUniLib.vcxproj", "{321A3902-E45B-4C80-B17F-491349134D67}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "STUniLib_Static", "STUniLib_Static\STUniLib_Static.vcxproj", "{5137FB40-5924-4F79-BA61-7E81CC4FA912}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lsfptest", "lsfptest\lsfptest.vcxproj", "{299F4794-6BB0-4839-908E-E2C675B4272B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ctest", "..\ctest\ctest.vcxproj", "{2CC9AD58-28A0-4C85-9EBF-A435E99DFF11}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -15,6 +21,18 @@ Global
 		{321A3902-E45B-4C80-B17F-491349134D67}.Debug|Win32.Build.0 = Debug|Win32
 		{321A3902-E45B-4C80-B17F-491349134D67}.Release|Win32.ActiveCfg = Release|Win32
 		{321A3902-E45B-4C80-B17F-491349134D67}.Release|Win32.Build.0 = Release|Win32
+		{5137FB40-5924-4F79-BA61-7E81CC4FA912}.Debug|Win32.ActiveCfg = Debug|Win32
+		{5137FB40-5924-4F79-BA61-7E81CC4FA912}.Debug|Win32.Build.0 = Debug|Win32
+		{5137FB40-5924-4F79-BA61-7E81CC4FA912}.Release|Win32.ActiveCfg = Release|Win32
+		{5137FB40-5924-4F79-BA61-7E81CC4FA912}.Release|Win32.Build.0 = Release|Win32
+		{299F4794-6BB0-4839-908E-E2C675B4272B}.Debug|Win32.ActiveCfg = Debug|Win32
+		{299F4794-6BB0-4839-908E-E2C675B4272B}.Debug|Win32.Build.0 = Debug|Win32
+		{299F4794-6BB0-4839-908E-E2C675B4272B}.Release|Win32.ActiveCfg = Release|Win32
+		{299F4794-6BB0-4839-908E-E2C675B4272B}.Release|Win32.Build.0 = Release|Win32
+		{2CC9AD58-28A0-4C85-9EBF-A435E99DFF11}.Debug|Win32.ActiveCfg = Debug|Win32
+		{2CC9AD58-28A0-4C85-9EBF-A435E99DFF11}.Debug|Win32.Build.0 = Debug|Win32
+		{2CC9AD58-28A0-4C85-9EBF-A435E99DFF11}.Release|Win32.ActiveCfg = Release|Win32
+		{2CC9AD58-28A0-4C85-9EBF-A435E99DFF11}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -4,11 +4,139 @@
 #include "stdafx.h"
 #include "STUniLib.h"
 #include "Vend_Ax.h"
-
+#include <stdio.h>
 #include <cstdlib>
 #include <iostream>
-#include <wchar.h>
+#include <tchar.h>
 
+//---------------------------------------------------------------------------
+// Размер области памяти для работы с устройством
+#define LEN_MEM 4096
+
+//---------------------------------------------------------------------------
+// Определения IOCTL индексов для обращения к драйверу
+#define USBCAM_IOCTL_INDEX  0x0800
+
+// Для команд HOLD, RUN
+#define IOCTL_UsbCam_VENDOR_REQUEST CTL_CODE(FILE_DEVICE_UNKNOWN,\
+                                     USBCAM_IOCTL_INDEX+5,\
+                                     METHOD_BUFFERED,\
+                                     FILE_ANY_ACCESS)
+
+// Для получения строки с версией
+#define IOCTL_UsbCam_GET_STRING_DESCRIPTOR  CTL_CODE(FILE_DEVICE_UNKNOWN,\
+                                     USBCAM_IOCTL_INDEX+17,\
+                                     METHOD_BUFFERED,\
+                                     FILE_ANY_ACCESS)
+
+// Для загрузки во внутреннюю память FX2
+#define IOCTL_USBCAM_ANCHOR_DOWNLOAD CTL_CODE(FILE_DEVICE_UNKNOWN,\
+                                     USBCAM_IOCTL_INDEX+27,\
+                                     METHOD_IN_DIRECT,\
+                                     FILE_ANY_ACCESS)
+
+
+//Для работы с "нулевой" конечной точкой FX2
+#define IOCTL_USBCAM_VENDOR_OR_CLASS_REQUEST CTL_CODE(FILE_DEVICE_UNKNOWN,\
+                                     USBCAM_IOCTL_INDEX+22,\
+                                     METHOD_IN_DIRECT,\
+                                     FILE_ANY_ACCESS)
+
+#define IOCTL_UsbCam_RESETPIPE CTL_CODE(FILE_DEVICE_UNKNOWN,\
+                                     USBCAM_IOCTL_INDEX+13,\
+                                     METHOD_IN_DIRECT,\
+                                     FILE_ANY_ACCESS)
+
+// для чтения указанного потока
+#define IOCTL_USBCAM_BULK_READ CTL_CODE(FILE_DEVICE_UNKNOWN,\
+                                     USBCAM_IOCTL_INDEX+19,\
+                                     METHOD_OUT_DIRECT,\
+                                     FILE_ANY_ACCESS)
+
+// Для чтения дескриптора устройства
+#define IOCTL_UsbCam_GET_DEVICE_DESCRIPTOR CTL_CODE(FILE_DEVICE_UNKNOWN,\
+                                     USBCAM_IOCTL_INDEX+1,\
+                                     METHOD_BUFFERED,\
+                                     FILE_ANY_ACCESS)
+
+// Для получения лога от драйвера
+#define IOCTL_USBCAM_GET_LOG CTL_CODE(FILE_DEVICE_UNKNOWN,\
+                                     USBCAM_IOCTL_INDEX+0x7f,\
+                                     METHOD_BUFFERED,\
+                                     FILE_ANY_ACCESS)
+
+// Сброс порта
+#define IOCTL_UsbCam_RESET   CTL_CODE(FILE_DEVICE_UNKNOWN,\
+                                     USBCAM_IOCTL_INDEX+12,\
+                                     METHOD_IN_DIRECT,\
+                                     FILE_ANY_ACCESS)
+
+
+
+//---------------------------------------------------------------------------
+// Для загрузки HEX файла в FX2
+#define TGT_IMG_SIZE 0x10000 // 64KB (65,536 Byte) target image
+#define TGT_SEG_SIZE 16 // 16 byte segments
+
+typedef struct {
+	WORD Addr;   // адрес
+	WORD Size;   // длина блока
+	PBYTE pData; // указатель на данные
+} MemSeg;
+
+typedef struct {
+	BYTE data[TGT_IMG_SIZE]; // target image store
+} TMemImg;
+
+typedef struct {
+	TMemImg *pImg;
+	int nSeg;                               // segment count
+	MemSeg pSeg[TGT_IMG_SIZE / TGT_SEG_SIZE]; // info about segments
+} TMemCache;
+
+typedef struct _GET_STRING_DESCRIPTOR_IN {
+	UCHAR    Index;
+	USHORT   LanguageId;
+} GET_STRING_DESCRIPTOR_IN, *PGET_STRING_DESCRIPTOR_IN;
+
+typedef struct _USB_STRING_DESCRIPTOR {
+	UCHAR  bLength;
+	UCHAR  bDescriptorType;
+	WCHAR  bString[1];
+} USB_STRING_DESCRIPTOR, *PUSB_STRING_DESCRIPTOR;
+
+// Структуры IOCTL для вызовов
+typedef struct _VENDOR_OR_CLASS_REQUEST_CONTROL {
+	// transfer direction (0=host to device, 1=device to host)
+	UCHAR direction;
+
+	// request type (1=class, 2=vendor)
+	UCHAR requestType;
+
+	// recipient (0=device,1=interface,2=endpoint,3=other)
+	UCHAR recepient;
+	//
+	// see the USB Specification for an explanation of the
+	// following paramaters.
+	//
+	UCHAR requestTypeReservedBits;
+	UCHAR request;
+	USHORT value;
+	USHORT index;
+} VENDOR_OR_CLASS_REQUEST_CONTROL, *PVENDOR_OR_CLASS_REQUEST_CONTROL;
+
+typedef struct _VENDOR_REQUEST_IN {
+	BYTE bRequest;
+	WORD wValue;
+	WORD wIndex;
+	WORD wLength;
+	BYTE direction;
+	BYTE bData;
+} VENDOR_REQUEST_IN, *PVENDOR_REQUEST_IN;
+
+typedef struct _BULK_TRANSFER_CONTROL {
+	ULONG pipeNum;
+} BULK_TRANSFER_CONTROL, *PBULK_TRANSFER_CONTROL;
 
 void __fastcall AllocateMemory(void);
 void __fastcall FreeMemory(void);
@@ -18,6 +146,12 @@ void *pMem = NULL,
 	 *pScan = NULL;
 
 device_tree dev_tr;
+
+// Обработка HEX файла и заполнение MemCache данными
+BOOL __fastcall FileToCache(TMemCache* pMemCache, CHAR *pHexFileName);
+BOOL __fastcall VendorRequest(HANDLE hDev, PVENDOR_OR_CLASS_REQUEST_CONTROL pReq, WORD Len);
+void __fastcall AllocateMemory(void);
+void __fastcall FreeMemory(void);
  
 BOOL APIENTRY DllMain( HANDLE hModule,
                        DWORD  ul_reason_for_call,
@@ -129,7 +263,7 @@ int current_left = 0;
 int current_top = 0;
 
 int get_device_num(HANDLE dev){
-	for (int i = 0; i < MAX_DEV_COUNT; i++) {
+	for (int i = 0; i < MAX_DEVICE_COUNT; i++) {
 		 if (dev_tr.device[i].dev == dev)
 		 	return i;
 	}
@@ -274,7 +408,7 @@ BOOL KCP2001::GetImage(HANDLE hDev, PBYTE image)
 
 	len = current_width*current_height;
 
-	if ( dev_tr.device[dev_num].Descriptor.iSerialNumber == 10 )
+	if (dev_tr.device[dev_num].Descriptor.WordWidth == 10)
 	{
 		twelve_bit_mode = 1;
 		len *= 2;
@@ -285,8 +419,8 @@ BOOL KCP2001::GetImage(HANDLE hDev, PBYTE image)
 		// If we have 10bit scanner we should prepare the array
 		if (twelve_bit_mode)
 		{
-			for (int i = 0; i < len; i++) {
-				image[i] = ((PUSHORT)image)[i] >> 2;
+			for (int i = 0; i < len/2; i++) {
+				image[i] = ((UINT16 *)image)[i] >> 2;
 			}
 		}
 
@@ -308,7 +442,7 @@ BOOL KCP2001::GetImage16(HANDLE hDev, PSHORT image)
 	  return FALSE;
   }
 
-  if (dev_tr.device[dev_num].Descriptor.iSerialNumber != 10)
+  if (dev_tr.device[dev_num].Descriptor.WordWidth != 10)
   {
 	  std::cout << "Device not comaptible with 10bit mode!";
 	  return false;
@@ -364,21 +498,32 @@ BYTE KCP2001::SetCamera(HANDLE hDev, BYTE num)
 BOOL KCP2001::GetLight(HANDLE hDev, PBYTE pData, BYTE num)
 {
 	PWORD pDat = (PWORD)pCam;
+	BYTE dev_num = 0; 
 
-	switch (num) {
-	case 0:	// Bottom backligth for right camera
-		if (!UploadI2C(hDev, 0, 1, pDat, 0x2E00)) return false;
-		break;
-	case 1: // Bottom backligth for left camera
-		if (!UploadI2C(hDev, 0, 1, pDat, 0x2C00)) return false;
-		break;
-	case 2: // Top backligth for left camera
-		if (!UploadI2C(hDev, 0, 1, pDat, 0x2D00)) return false;
-		break;
-	case 3: // Top backligth for right camera
-		if (!UploadI2C(hDev, 0, 1, pDat, 0x2F00)) return false;
-		break;
+	if ((dev_num = get_device_num(hDev)) < 0) {
+		std::cout << "Device handle is not from device tree!";
+		return FALSE;
 	}
+
+	if (dev_tr.device[dev_num].Descriptor.WordWidth == 10) 
+		switch (num) {
+		case 0:	// Bottom backligth for right camera
+			if (!UploadI2C(hDev, 0, 1, pDat, 0x2E00)) return false;
+			break;
+		case 1: // Bottom backligth for left camera
+			if (!UploadI2C(hDev, 0, 1, pDat, 0x2C00)) return false;
+			break;
+		case 2: // Top backligth for left camera
+			if (!UploadI2C(hDev, 0, 1, pDat, 0x2D00)) return false;
+			break;
+		case 3: // Top backligth for right camera
+			if (!UploadI2C(hDev, 0, 1, pDat, 0x2F00)) return false;
+			break;
+		}
+	else
+		if (!UploadI2C(hDev, 0, 1, pDat, ((0x2C00 >> 8) + num) << 8)) return false;
+
+
 	*pData = 255 - *pDat;
 	return false;
 }
@@ -387,21 +532,32 @@ BOOL KCP2001::GetLight(HANDLE hDev, PBYTE pData, BYTE num)
 BOOL KCP2001::SetLight(HANDLE hDev, BYTE Data, BYTE num)
 {
 	PWORD pData = (PWORD)pCam;
-	pData[0] = 255 - Data;
-	switch (num) {
-	case 0:	// Bottom backligth for right camera
-		if (DownloadI2C(hDev, 0, 1, pData, 0x2E00)) return true;
-		break;
-	case 1: // Bottom backligth for left camera
-		if (DownloadI2C(hDev, 0, 1, pData, 0x2C00)) return true;
-		break;
-	case 2: // Top backligth for left camera
-		if (DownloadI2C(hDev, 0, 1, pData, 0x2D00)) return true;
-		break;
-	case 3: // Top backligth for right camera
-		if (DownloadI2C(hDev, 0, 1, pData, 0x2F00)) return true;
-		break;
+	BYTE dev_num = 0;
+	
+	if ((dev_num = get_device_num(hDev)) < 0) {
+		std::cout << "Device handle is not from device tree!";
+		return FALSE;
 	}
+
+	pData[0] = 255 - Data;
+
+	if (dev_tr.device[dev_num].Descriptor.WordWidth == 10)
+		switch (num) {
+		case 0:	// Bottom backligth for right camera
+			if (DownloadI2C(hDev, 0, 1, pData, 0x2E00)) return true;
+			break;
+		case 1: // Bottom backligth for left camera
+			if (DownloadI2C(hDev, 0, 1, pData, 0x2C00)) return true;
+			break;
+		case 2: // Top backligth for left camera
+			if (DownloadI2C(hDev, 0, 1, pData, 0x2D00)) return true;
+			break;
+		case 3: // Top backligth for right camera
+			if (DownloadI2C(hDev, 0, 1, pData, 0x2F00)) return true;
+			break;
+		} 
+	else 
+		if (DownloadI2C(hDev, 0, 1, pData, ((0x2C00 >> 8) + num) << 8)) return true;
 
 	return false;
 }
@@ -433,31 +589,29 @@ ST_USBDevice::~ST_USBDevice(void)
 HANDLE ST_USBDevice::OpenDevice(int Number)
 {
 	 
-	wchar_t *DevName = new wchar_t[32];
-	wsprintf(DevName, (LPWSTR)"\\\\.\\UsbCam-%d", Number);
-
+	TCHAR DevName[256];
+	_stprintf_s(DevName, L"\\\\.\\UsbCam-%d", Number);
+	
 	HANDLE hnd = CreateFile(DevName, GENERIC_WRITE|GENERIC_READ, FILE_SHARE_WRITE,
 					NULL, OPEN_EXISTING, 0, NULL);
 
 	dev_tr.device[Number].dev = hnd;
-	delete DevName;
+	
 	return hnd;
 }
 
 void ST_USBDevice::CloseDevice(int Number)
 {
-	wchar_t *DevName = new wchar_t[32];
-	wsprintf(DevName, (LPWSTR)"\\\\.\\UsbCam-%d", Number);
-  DeleteFile(DevName);
-  delete DevName;
-  return;
+	TCHAR DevName[256];
+	_stprintf_s(DevName, L"\\\\.\\UsbCam-%d", Number);
+	DeleteFile(DevName);
+	return;
 }
 //---------------------------------------------------------------------------
 // Получить список доступных устройств
 int ST_USBDevice::GetDeviceCount(pdevice_tree dev_tree)
 {
   int dev_num = 0;
-  BYTE bitmode=8;
   HANDLE hDev = INVALID_HANDLE_VALUE;
 
   pdevice_tree p = &dev_tr;
@@ -473,7 +627,7 @@ int ST_USBDevice::GetDeviceCount(pdevice_tree dev_tree)
 	  if (p->device[i].Descriptor.idProduct != 0x8613)
 	  {
 		 GetSerialNo(hDev, &p->device[i].SN.SerNo);
-		 GetType(hDev, &p->device[i].dev_type, &bitmode);
+		 GetType(hDev, &p->device[i].dev_type);
 	  } else {
 			p->device[i].dev_type = NONE;
 			p->device[i].SN.SerNo = 0x8613;
@@ -492,7 +646,7 @@ int ST_USBDevice::GetDeviceCount(pdevice_tree dev_tree)
 }
 //---------------------------------------------------------------------------
 // Тип устройства?
-BOOL _fastcall ST_USBDevice::GetType(HANDLE hDev, pdevice_type pValue, BYTE *bitcount)
+BOOL _fastcall ST_USBDevice::GetType(HANDLE hDev, pdevice_type pValue)
 {
   BYTE Data;
   VENDOR_OR_CLASS_REQUEST_CONTROL Req;
@@ -507,8 +661,7 @@ BOOL _fastcall ST_USBDevice::GetType(HANDLE hDev, pdevice_type pValue, BYTE *bit
 
   if(VendorRequest(hDev, &Req, 2)) {
 	Data = *((PBYTE)pMem);
-	*pValue = (device_type)Data;
-	*bitcount = ((PBYTE)pMem)[1];
+	*pValue = (device_type)Data; 
     return TRUE;
   }
   return FALSE;
@@ -941,7 +1094,7 @@ BOOL ST_USBDevice::DownloadFirmware(HANDLE hDev, PCHAR pHexFileName)
 #define MAX_EP0_XFER_SIZE (1024*4)
 //---------------------------------------------------------------------------
 // Обработка HEX файла и заполнение MemCache данными
-BOOL __fastcall ST_USBDevice::FileToCache(TMemCache* pMemCache, CHAR *pHexFileName)
+BOOL __fastcall FileToCache(TMemCache* pMemCache, CHAR *pHexFileName)
 {
   BOOL bRet = FALSE;
   HANDLE hFile;
@@ -1063,7 +1216,7 @@ BOOL __fastcall ST_USBDevice::FileToCache(TMemCache* pMemCache, CHAR *pHexFileNa
 
 //---------------------------------------------------------------------------
 // Используется для работы с "нулевой" конечной точкой
-BOOL __fastcall ST_USBDevice::VendorRequest(HANDLE hDev, PVENDOR_OR_CLASS_REQUEST_CONTROL pReq,WORD Len)
+BOOL __fastcall VendorRequest(HANDLE hDev, PVENDOR_OR_CLASS_REQUEST_CONTROL pReq,WORD Len)
 {
   DWORD dwRet;
   PVOID pBuf = (Len) ? pMem : NULL;
