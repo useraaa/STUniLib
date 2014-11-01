@@ -95,10 +95,10 @@ public:
 	~ST_USBDevice(void);
 	// Получить количество, список доступных устройств
 	int GetDeviceCount(pdevice_tree dev_tree);
-	// Открыть устройство с номером из списка
+	// Открыть устройство
 	HANDLE OpenDevice(int Number);
-	// Закрыть устройство с номером из списка
-	void CloseDevice(int Number);
+	// Закрыть устройство
+	void CloseDevice(HANDLE hDev);
 	// Устройство подключено? TRUE - да
 	BOOL IsConnectDev(int Number);
 	// Прочитать строку с версией "firmware"

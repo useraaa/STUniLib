@@ -600,10 +600,17 @@ HANDLE ST_USBDevice::OpenDevice(int Number)
 	return hnd;
 }
 
-void ST_USBDevice::CloseDevice(int Number)
+void ST_USBDevice::CloseDevice(HANDLE hDev)
 {
 	TCHAR DevName[256];
-	_stprintf_s(DevName, L"\\\\.\\UsbCam-%d", Number);
+	BYTE dev_num = 0;
+
+	if ((dev_num = get_device_num(hDev)) < 0) {
+		std::cout << "Device handle is not from device tree!";
+		return;
+	}
+
+	_stprintf_s(DevName, L"\\\\.\\UsbCam-%d", dev_num);
 	DeleteFile(DevName);
 	return;
 }
