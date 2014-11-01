@@ -109,9 +109,9 @@ public:
 	BOOL GetSerialNo(HANDLE hDev, PWORD pBuff);
 	BOOL SetSerialNo(HANDLE hDev, WORD serial);
 	// ѕолучить тип устройства
-	BOOL _fastcall GetType(HANDLE hDev, pdevice_type pValue);
+	BOOL GetType(HANDLE hDev, pdevice_type pValue);
 	// Reset device;
-	BOOL __fastcall ResetDevice(HANDLE hDev, BYTE RestBit);
+	BOOL ResetDevice(HANDLE hDev, BYTE RestBit);
 	// Vendor request с устанавливаемыми параметрами
 	BOOL VREQ(HANDLE hDev, BYTE req, WORD value, WORD index, BYTE len, PBYTE pData);
 	// —бросить поток

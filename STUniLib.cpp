@@ -646,7 +646,7 @@ int ST_USBDevice::GetDeviceCount(pdevice_tree dev_tree)
 }
 //---------------------------------------------------------------------------
 // Тип устройства?
-BOOL _fastcall ST_USBDevice::GetType(HANDLE hDev, pdevice_type pValue)
+BOOL ST_USBDevice::GetType(HANDLE hDev, pdevice_type pValue)
 {
   BYTE Data;
   VENDOR_OR_CLASS_REQUEST_CONTROL Req;
@@ -702,7 +702,7 @@ BOOL ST_USBDevice::GetDevDescr(HANDLE hDev, PUSB_DEVICE_DESCRIPTOR pDD)
 
 //---------------------------------------------------------------------------
 // Установить состояние бита CPUCS.0 в FX2
-BOOL __fastcall ST_USBDevice::ResetDevice(HANDLE hDev, BYTE RestBit)
+BOOL ST_USBDevice::ResetDevice(HANDLE hDev, BYTE RestBit)
 {
   DWORD dwRet;
   VENDOR_REQUEST_IN VReq;
