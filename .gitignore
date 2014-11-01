@@ -21,3 +21,9 @@ Debug/vc120.idb
 Debug/vc120.pdb
 ipch/stunilib-b7e7e5e7/stunilib-47c1d976.ipch
 STUniLib.opensdf
+*.ipch
+*.exe
+*.pdb
+*.log
+*.user
+*.pch
